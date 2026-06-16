@@ -8,6 +8,7 @@ const planes = ['xy', 'xz', 'yz'].map(p =>
   new PlaneView(document.getElementById(`plane-${p}`), p)
 );
 
+// Gate toolbar
 const gatesEl = document.getElementById('gates');
 for (const gate of GATES) {
   const btn = document.createElement('button');
@@ -21,6 +22,65 @@ document.getElementById('btn-reset').addEventListener('click', () => state.reset
 document.getElementById('btn-random').addEventListener('click', () => state.randomize());
 document.getElementById('btn-clear').addEventListener('click', () => state.clearTrail());
 
+// Theme toggle
+const btnTheme = document.getElementById('btn-theme');
+if (localStorage.getItem('theme') === 'light') {
+  document.body.classList.add('light');
+  btnTheme.textContent = 'Dark';
+}
+btnTheme.addEventListener('click', () => {
+  const isLight = document.body.classList.toggle('light');
+  localStorage.setItem('theme', isLight ? 'light' : 'dark');
+  btnTheme.textContent = isLight ? 'Dark' : 'Light';
+});
+
+// Panel resize
+(function initPanelResize() {
+  document.querySelectorAll('.resize-handle').forEach(handle => {
+    let drag = null;
+
+    handle.addEventListener('pointerdown', e => {
+      const above = handle.previousElementSibling;
+      const below = handle.nextElementSibling;
+      drag = {
+        startY: e.clientY,
+        startX: e.clientX,
+        aboveH: above.getBoundingClientRect().height,
+        belowH: below.getBoundingClientRect().height,
+        aboveW: above.getBoundingClientRect().width,
+        belowW: below.getBoundingClientRect().width,
+        above,
+        below,
+      };
+      handle.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+
+    handle.addEventListener('pointermove', e => {
+      if (!drag) return;
+      const isMobile = window.innerWidth <= 900;
+      if (isMobile) {
+        const dx = e.clientX - drag.startX;
+        const total = drag.aboveW + drag.belowW;
+        const newAbove = Math.max(80, Math.min(total - 80, drag.aboveW + dx));
+        drag.above.style.flex = `0 0 ${newAbove}px`;
+        drag.below.style.flex = `0 0 ${total - newAbove}px`;
+      } else {
+        const dy = e.clientY - drag.startY;
+        const total = drag.aboveH + drag.belowH;
+        const newAbove = Math.max(60, Math.min(total - 60, drag.aboveH + dy));
+        drag.above.style.flex = `0 0 ${newAbove}px`;
+        drag.below.style.flex = `0 0 ${total - newAbove}px`;
+      }
+    });
+
+    const end = () => { drag = null; };
+    handle.addEventListener('pointerup', end);
+    handle.addEventListener('pointercancel', end);
+  });
+})();
+
+// State readout
 const roPsi = document.getElementById('ro-psi');
 const roAng = document.getElementById('ro-ang');
 const roVec = document.getElementById('ro-vec');
@@ -46,6 +106,7 @@ function updateReadout() {
     `x = ${fmt(state.v.x)}  y = ${fmt(state.v.y)}  z = ${fmt(state.v.z)}`;
 }
 
+// Render loop
 let last = performance.now();
 function frame(now) {
   const dt = Math.min((now - last) / 1000, 0.05);

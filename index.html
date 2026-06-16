@@ -19,26 +19,29 @@
     <header>
       <h1>Bloch Sphere Playground</h1>
       <span class="hint">drag the amber tip to set |&psi;&rangle; &middot; drag elsewhere to orbit &middot; scroll to zoom</span>
+      <button id="btn-theme" class="util theme-btn" title="Toggle light/dark theme">Light</button>
     </header>
 
     <div id="view3d"></div>
 
     <div id="side">
-      <div class="panel">
+      <div class="panel" id="panel-xy">
         <div class="panel-title">
           <span class="ax-x">X</span><span class="ax-y">Y</span> plane
           <span class="sub">view from +z</span>
         </div>
         <div class="panel-body"><canvas id="plane-xy"></canvas></div>
       </div>
-      <div class="panel">
+      <div class="resize-handle"></div>
+      <div class="panel" id="panel-xz">
         <div class="panel-title">
           <span class="ax-x">X</span><span class="ax-z">Z</span> plane
           <span class="sub">view from &minus;y</span>
         </div>
         <div class="panel-body"><canvas id="plane-xz"></canvas></div>
       </div>
-      <div class="panel">
+      <div class="resize-handle"></div>
+      <div class="panel" id="panel-yz">
         <div class="panel-title">
           <span class="ax-y">Y</span><span class="ax-z">Z</span> plane
           <span class="sub">view from +x</span>

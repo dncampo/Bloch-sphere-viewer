@@ -107,6 +107,8 @@ export class Bloch3D {
 
     new ResizeObserver(() => this.resize()).observe(container);
     this.resize();
+    // Deferred resize in case the grid hasn't finished layout at construction time.
+    requestAnimationFrame(() => this.resize());
   }
 
   buildSphere() {

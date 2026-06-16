@@ -1,18 +1,25 @@
 // 2D orthographic projection of the Bloch vector onto a coordinate plane,
 // drawn on a canvas. Updated every frame alongside the 3D view.
 
-const AXIS_COLORS = { x: '#ff5370', y: '#3fd68c', z: '#5aa2ff' };
-const VEC_COLOR = '#ffb300';
-const RING_COLOR = '#3a4458';
-const DIM = '#8b95a7';
+function getColors() {
+  const s = getComputedStyle(document.documentElement);
+  return {
+    axX: s.getPropertyValue('--ax-x').trim(),
+    axY: s.getPropertyValue('--ax-y').trim(),
+    axZ: s.getPropertyValue('--ax-z').trim(),
+    vec: s.getPropertyValue('--vec').trim(),
+    ring: s.getPropertyValue('--ring').trim(),
+    dim: s.getPropertyValue('--dim').trim(),
+  };
+}
 
 export class PlaneView {
   constructor(canvas, plane) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
-    this.h = plane[0]; // horizontal axis name, e.g. 'x'
-    this.vAx = plane[1]; // vertical axis name, e.g. 'y'
-    this.out = 'xyz'.replace(plane[0], '').replace(plane[1], ''); // out-of-plane axis
+    this.h = plane[0];
+    this.vAx = plane[1];
+    this.out = 'xyz'.replace(plane[0], '').replace(plane[1], '');
     this.w = 0;
     this.hgt = 0;
 
@@ -30,6 +37,9 @@ export class PlaneView {
   draw(vec, trail) {
     const { ctx, w, hgt: h } = this;
     if (!w || !h) return;
+    const C = getColors();
+    const axColors = { x: C.axX, y: C.axY, z: C.axZ };
+
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
 
@@ -45,14 +55,14 @@ export class PlaneView {
     // Crosshair axes, colored to match the 3D view.
     ctx.lineWidth = 1;
     ctx.globalAlpha = 0.45;
-    ctx.strokeStyle = AXIS_COLORS[this.h];
+    ctx.strokeStyle = axColors[this.h];
     line(ctx, cx - R - 8, cy, cx + R + 8, cy);
-    ctx.strokeStyle = AXIS_COLORS[this.vAx];
+    ctx.strokeStyle = axColors[this.vAx];
     line(ctx, cx, cy + R + 8, cx, cy - R - 8);
     ctx.globalAlpha = 1;
 
     // Unit circle (the sphere's silhouette) and half-radius guide.
-    ctx.strokeStyle = RING_COLOR;
+    ctx.strokeStyle = C.ring;
     ctx.lineWidth = 1.5;
     circle(ctx, cx, cy, R);
     ctx.save();
@@ -62,19 +72,19 @@ export class PlaneView {
     circle(ctx, cx, cy, R / 2);
     ctx.restore();
 
-    // Axis letters and unit ticks.
+    // Axis letters.
     ctx.font = '600 12px system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = AXIS_COLORS[this.h];
+    ctx.fillStyle = axColors[this.h];
     ctx.fillText(`+${this.h}`, cx + R + 14, cy);
-    ctx.fillStyle = AXIS_COLORS[this.vAx];
+    ctx.fillStyle = axColors[this.vAx];
     ctx.fillText(`+${this.vAx}`, cx, cy - R - 14);
 
     // Trace of recent motion, projected onto this plane.
     if (trail.length > 1) {
       ctx.lineWidth = 1.5;
-      ctx.strokeStyle = VEC_COLOR;
+      ctx.strokeStyle = C.vec;
       const n = trail.length;
       for (let i = 1; i < n; i++) {
         ctx.globalAlpha = 0.05 + 0.45 * (i / n) ** 2;
@@ -85,32 +95,31 @@ export class PlaneView {
       ctx.globalAlpha = 1;
     }
 
-    // Dashed circle at the current in-plane radius — rotations about the
-    // out-of-plane axis move the state along this circle.
+    // Dashed circle at the current in-plane radius.
     const r = Math.hypot(a, b);
     if (r > 0.02) {
       ctx.save();
       ctx.setLineDash([4, 6]);
-      ctx.strokeStyle = VEC_COLOR;
+      ctx.strokeStyle = C.vec;
       ctx.globalAlpha = 0.3;
       circle(ctx, cx, cy, r * R);
       ctx.restore();
     }
 
     // Projected state vector.
-    arrow(ctx, cx, cy, px(a), py(b), VEC_COLOR, 2);
-    ctx.fillStyle = VEC_COLOR;
+    arrow(ctx, cx, cy, px(a), py(b), C.vec, 2);
+    ctx.fillStyle = C.vec;
     dot(ctx, px(a), py(b), 4);
 
-    // Numeric readout: in-plane coordinates bright, out-of-plane dimmed.
+    // Numeric readout.
     ctx.font = '11px ui-monospace, Consolas, monospace';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'alphabetic';
-    ctx.fillStyle = AXIS_COLORS[this.h];
+    ctx.fillStyle = axColors[this.h];
     ctx.fillText(`${this.h} ${fmt(a)}`, 8, h - 8);
-    ctx.fillStyle = AXIS_COLORS[this.vAx];
+    ctx.fillStyle = axColors[this.vAx];
     ctx.fillText(`${this.vAx} ${fmt(b)}`, 78, h - 8);
-    ctx.fillStyle = DIM;
+    ctx.fillStyle = C.dim;
     ctx.textAlign = 'right';
     ctx.fillText(`${this.out} ${fmt(out)}`, w - 8, h - 8);
   }
