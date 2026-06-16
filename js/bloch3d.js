@@ -1,23 +1,33 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-const COLORS = {
-  x: 0xff5370,
-  y: 0x3fd68c,
-  z: 0x5aa2ff,
-  vec: 0xffb300,
-  ring: 0x3a4458,
-  text: '#dfe6f0',
+const THEME = {
+  dark: {
+    ring:         0x3a4458,
+    text:         '#dfe6f0',
+    textDim:      '#9aa5b8',
+    vec:          0xffb300,
+    trailDim:     0x2a2417,
+    sphereOpacity: 0.12,
+  },
+  light: {
+    ring:         0xa0aec0,
+    text:         '#1a2035',
+    textDim:      '#4b5563',
+    vec:          0xd97706,
+    trailDim:     0xfef3c7,
+    sphereOpacity: 0.20,
+  },
 };
+
+const AXIS_COLORS = { x: 0xff5370, y: 0x3fd68c, z: 0x5aa2ff };
 
 const TRAIL_MAX = 1500;
 
-// Bloch coords are z-up; three.js is y-up. Right-handed mapping:
-// (bx, by, bz) -> three (bx, bz, -by)
 const b2t = b => new THREE.Vector3(b.x, b.z, -b.y);
 const t2b = t => ({ x: t.x, y: -t.z, z: t.y });
 
-function textSprite(text, { color = COLORS.text, size = 0.26 } = {}) {
+function textSprite(text, { color = '#dfe6f0', size = 0.26 } = {}) {
   const pad = 24, fontPx = 96;
   const c = document.createElement('canvas');
   const g = c.getContext('2d');
@@ -39,9 +49,7 @@ function textSprite(text, { color = COLORS.text, size = 0.26 } = {}) {
   return sprite;
 }
 
-// Circle of given radius in a Bloch coordinate plane ('xy' | 'xz' | 'yz'),
-// optionally offset along the plane normal (for latitude circles).
-function circleLine(plane, { radius = 1, offset = 0, color = COLORS.ring, opacity = 0.5 } = {}) {
+function circleLine(plane, { radius = 1, offset = 0, color = THEME.dark.ring, opacity = 0.5 } = {}) {
   const pts = [];
   for (let i = 0; i <= 128; i++) {
     const t = (i / 128) * 2 * Math.PI;
@@ -52,22 +60,22 @@ function circleLine(plane, { radius = 1, offset = 0, color = COLORS.ring, opacit
     else p = { x: offset, y: a, z: b };
     pts.push(b2t(p));
   }
-  return new THREE.Line(
-    new THREE.BufferGeometry().setFromPoints(pts),
-    new THREE.LineBasicMaterial({ color, transparent: true, opacity })
-  );
+  const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity });
+  return new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat);
 }
 
 function axisLine(axis, color) {
   const dir = b2t(axis);
+  const lineMat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.85 });
   const line = new THREE.Line(
-    new THREE.BufferGeometry().setFromPoints([dir.clone().multiplyScalar(-1.15), dir.clone().multiplyScalar(1.15)]),
-    new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.85 })
+    new THREE.BufferGeometry().setFromPoints([
+      dir.clone().multiplyScalar(-1.15),
+      dir.clone().multiplyScalar(1.15),
+    ]),
+    lineMat
   );
-  const cone = new THREE.Mesh(
-    new THREE.ConeGeometry(0.03, 0.1, 16),
-    new THREE.MeshBasicMaterial({ color })
-  );
+  const coneMat = new THREE.MeshBasicMaterial({ color });
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.1, 16), coneMat);
   cone.position.copy(dir.clone().multiplyScalar(1.15));
   cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
   const group = new THREE.Group();
@@ -79,6 +87,7 @@ export class Bloch3D {
   constructor(container, onDragVector) {
     this.container = container;
     this.onDragVector = onDragVector;
+    this.isLight = false;
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -100,6 +109,9 @@ export class Bloch3D {
     light.position.set(3, 4, 2);
     this.scene.add(light);
 
+    this.ringMats = [];
+    this.labelSprites = [];
+
     this.buildSphere();
     this.buildVector();
     this.buildTrail();
@@ -107,67 +119,69 @@ export class Bloch3D {
 
     new ResizeObserver(() => this.resize()).observe(container);
     this.resize();
-    // Deferred resize in case the grid hasn't finished layout at construction time.
     requestAnimationFrame(() => this.resize());
   }
 
   buildSphere() {
-    const surface = new THREE.Mesh(
-      new THREE.SphereGeometry(1, 48, 32),
-      new THREE.MeshPhongMaterial({
-        color: 0x3a78c9,
-        transparent: true,
-        opacity: 0.12,
-        depthWrite: false,
-        shininess: 60,
-      })
-    );
-    this.scene.add(surface);
+    this.sphereMat = new THREE.MeshPhongMaterial({
+      color: 0x3a78c9,
+      transparent: true,
+      opacity: THEME.dark.sphereOpacity,
+      depthWrite: false,
+      shininess: 60,
+    });
+    this.scene.add(new THREE.Mesh(new THREE.SphereGeometry(1, 48, 32), this.sphereMat));
 
-    // Great circles, one per projection plane.
-    this.scene.add(circleLine('xy', { opacity: 0.7 }));
-    this.scene.add(circleLine('xz', { opacity: 0.7 }));
-    this.scene.add(circleLine('yz', { opacity: 0.7 }));
-    // Faint latitude circles.
+    const addRing = (plane, opts) => {
+      const ring = circleLine(plane, opts);
+      this.ringMats.push(ring.material);
+      this.scene.add(ring);
+    };
+    addRing('xy', { opacity: 0.7 });
+    addRing('xz', { opacity: 0.7 });
+    addRing('yz', { opacity: 0.7 });
     for (const off of [-0.5, 0.5]) {
-      this.scene.add(circleLine('xy', { radius: Math.sqrt(1 - off * off), offset: off, opacity: 0.22 }));
+      addRing('xy', { radius: Math.sqrt(1 - off * off), offset: off, opacity: 0.22 });
     }
 
-    this.scene.add(axisLine({ x: 1, y: 0, z: 0 }, COLORS.x));
-    this.scene.add(axisLine({ x: 0, y: 1, z: 0 }, COLORS.y));
-    this.scene.add(axisLine({ x: 0, y: 0, z: 1 }, COLORS.z));
+    this.scene.add(axisLine({ x: 1, y: 0, z: 0 }, AXIS_COLORS.x));
+    this.scene.add(axisLine({ x: 0, y: 1, z: 0 }, AXIS_COLORS.y));
+    this.scene.add(axisLine({ x: 0, y: 0, z: 1 }, AXIS_COLORS.z));
 
-    const labels = [
-      ['x', { x: 1.34, y: 0, z: 0 }, '#ff5370'],
-      ['y', { x: 0, y: 1.34, z: 0 }, '#3fd68c'],
-      ['z', { x: 0, y: 0, z: 1.34 }, '#5aa2ff'],
-      ['|0⟩', { x: 0.2, y: 0, z: 1.12 }, COLORS.text],
-      ['|1⟩', { x: 0.2, y: 0, z: -1.12 }, COLORS.text],
-      ['|+⟩', { x: 1.1, y: 0, z: -0.14 }, '#9aa5b8'],
-      ['|−⟩', { x: -1.1, y: 0, z: -0.14 }, '#9aa5b8'],
-      ['|+i⟩', { x: 0, y: 1.1, z: -0.14 }, '#9aa5b8'],
-      ['|−i⟩', { x: 0, y: -1.1, z: -0.14 }, '#9aa5b8'],
+    const T = THEME.dark;
+    const labelDefs = [
+      { text: 'x',    pos: { x:  1.34, y: 0,    z: 0    }, color: '#ff5370', size: 0.26 },
+      { text: 'y',    pos: { x:  0,    y: 1.34,  z: 0    }, color: '#3fd68c', size: 0.26 },
+      { text: 'z',    pos: { x:  0,    y: 0,     z: 1.34 }, color: '#5aa2ff', size: 0.26 },
+      { text: '|0⟩',  pos: { x:  0.2,  y: 0,    z: 1.12 }, colorKey: 'text',    size: 0.21 },
+      { text: '|1⟩',  pos: { x:  0.2,  y: 0,    z:-1.12 }, colorKey: 'text',    size: 0.21 },
+      { text: '|+⟩',  pos: { x:  1.1,  y: 0,    z:-0.14 }, colorKey: 'textDim', size: 0.21 },
+      { text: '|−⟩',  pos: { x: -1.1,  y: 0,    z:-0.14 }, colorKey: 'textDim', size: 0.21 },
+      { text: '|+i⟩', pos: { x:  0,    y: 1.1,  z:-0.14 }, colorKey: 'textDim', size: 0.21 },
+      { text: '|−i⟩', pos: { x:  0,    y:-1.1,  z:-0.14 }, colorKey: 'textDim', size: 0.21 },
     ];
-    for (const [text, pos, color] of labels) {
-      const s = textSprite(text, { color, size: text.length > 2 ? 0.21 : 0.26 });
-      s.position.copy(b2t(pos));
-      this.scene.add(s);
+
+    for (const def of labelDefs) {
+      const color = def.color ?? T[def.colorKey];
+      const sprite = textSprite(def.text, { color, size: def.size });
+      sprite.position.copy(b2t(def.pos));
+      this.scene.add(sprite);
+      if (def.colorKey) {
+        this.labelSprites.push({ sprite, text: def.text, colorKey: def.colorKey, size: def.size, pos: def.pos });
+      }
     }
   }
 
   buildVector() {
     this.arrow = new THREE.ArrowHelper(
-      new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 0), 1, COLORS.vec, 0.14, 0.06
+      new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 0), 1, THEME.dark.vec, 0.14, 0.06
     );
     this.scene.add(this.arrow);
 
-    this.tipDot = new THREE.Mesh(
-      new THREE.SphereGeometry(0.035, 16, 12),
-      new THREE.MeshBasicMaterial({ color: COLORS.vec })
-    );
+    this.tipDotMat = new THREE.MeshBasicMaterial({ color: THEME.dark.vec });
+    this.tipDot = new THREE.Mesh(new THREE.SphereGeometry(0.035, 16, 12), this.tipDotMat);
     this.scene.add(this.tipDot);
 
-    // Oversized invisible hit target around the tip, for grabbing.
     this.tipHandle = new THREE.Mesh(
       new THREE.SphereGeometry(0.16, 12, 8),
       new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })
@@ -221,7 +235,6 @@ export class Bloch3D {
     el.addEventListener('pointermove', e => {
       const ray = castFrom(e);
       if (this.dragging) {
-        // Drag along the sphere surface; if the ray misses, use the closest point.
         if (!ray.ray.intersectSphere(unitSphere, hit)) {
           ray.ray.closestPointToPoint(unitSphere.center, hit);
           hit.normalize();
@@ -245,25 +258,48 @@ export class Bloch3D {
     el.addEventListener('pointercancel', endDrag);
   }
 
+  setTheme(isLight) {
+    this.isLight = isLight;
+    const T = isLight ? THEME.light : THEME.dark;
+
+    this.sphereMat.opacity = T.sphereOpacity;
+
+    for (const mat of this.ringMats) {
+      mat.color.setHex(T.ring);
+    }
+
+    this.arrow.setColor(T.vec);
+    this.tipDotMat.color.setHex(T.vec);
+
+    for (const entry of this.labelSprites) {
+      const color = T[entry.colorKey];
+      const newSprite = textSprite(entry.text, { color, size: entry.size });
+      entry.sprite.material.map.dispose();
+      entry.sprite.material.map = newSprite.material.map;
+      entry.sprite.material.needsUpdate = true;
+    }
+  }
+
   setVector(v, trail) {
     const dir = b2t(v).normalize();
     this.arrow.setDirection(dir);
     this.tipDot.position.copy(dir);
     this.tipHandle.position.copy(dir);
 
+    const T = this.isLight ? THEME.light : THEME.dark;
     const n = Math.min(trail.length, TRAIL_MAX);
     const start = trail.length - n;
-    const bright = new THREE.Color(COLORS.vec);
-    const dim = new THREE.Color(0x2a2417);
+    const bright = new THREE.Color(T.vec);
+    const dim = new THREE.Color(T.trailDim);
     const c = new THREE.Color();
     for (let i = 0; i < n; i++) {
       const p = b2t(trail[start + i]);
-      this.trailPositions[i * 3] = p.x;
+      this.trailPositions[i * 3]     = p.x;
       this.trailPositions[i * 3 + 1] = p.y;
       this.trailPositions[i * 3 + 2] = p.z;
       const t = n > 1 ? i / (n - 1) : 1;
       c.lerpColors(dim, bright, 0.15 + 0.85 * t * t);
-      this.trailColors[i * 3] = c.r;
+      this.trailColors[i * 3]     = c.r;
       this.trailColors[i * 3 + 1] = c.g;
       this.trailColors[i * 3 + 2] = c.b;
     }

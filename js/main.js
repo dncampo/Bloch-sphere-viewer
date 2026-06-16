@@ -24,15 +24,46 @@ document.getElementById('btn-clear').addEventListener('click', () => state.clear
 
 // Theme toggle
 const btnTheme = document.getElementById('btn-theme');
-if (localStorage.getItem('theme') === 'light') {
-  document.body.classList.add('light');
-  btnTheme.textContent = 'Dark';
-}
-btnTheme.addEventListener('click', () => {
-  const isLight = document.body.classList.toggle('light');
-  localStorage.setItem('theme', isLight ? 'light' : 'dark');
+function applyTheme(isLight) {
+  document.body.classList.toggle('light', isLight);
   btnTheme.textContent = isLight ? 'Dark' : 'Light';
+  view3d.setTheme(isLight);
+}
+const savedLight = localStorage.getItem('theme') === 'light';
+applyTheme(savedLight);
+btnTheme.addEventListener('click', () => {
+  const isLight = !document.body.classList.contains('light');
+  localStorage.setItem('theme', isLight ? 'light' : 'dark');
+  applyTheme(isLight);
 });
+
+// Column resize (3D view vs side panel)
+(function initColumnResize() {
+  const handle = document.getElementById('col-handle');
+  const app = document.getElementById('app');
+  let drag = null;
+
+  handle.addEventListener('pointerdown', e => {
+    drag = {
+      startX: e.clientX,
+      startW: document.getElementById('side').getBoundingClientRect().width,
+    };
+    handle.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+
+  handle.addEventListener('pointermove', e => {
+    if (!drag) return;
+    // dragging left widens side panel, dragging right shrinks it
+    const dx = drag.startX - e.clientX;
+    const newW = Math.max(200, Math.min(700, drag.startW + dx));
+    app.style.gridTemplateColumns = `1fr 6px ${newW}px`;
+  });
+
+  const end = () => { drag = null; };
+  handle.addEventListener('pointerup', end);
+  handle.addEventListener('pointercancel', end);
+})();
 
 // Panel resize
 (function initPanelResize() {
