@@ -1,0 +1,10 @@
+{
+  "name": "bloch-sphere-playground",
+  "version": "1.0.0",
+  "description": "Interactive Bloch sphere with live XY / XZ / YZ plane projections",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "python3 -m http.server 8000"
+  }
+}

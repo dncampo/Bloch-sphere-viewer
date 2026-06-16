@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bloch Sphere Playground</title>
+  <link rel="stylesheet" href="style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>Bloch Sphere Playground</h1>
+      <span class="hint">drag the amber tip to set |&psi;&rangle; &middot; drag elsewhere to orbit &middot; scroll to zoom</span>
+    </header>
+
+    <div id="view3d"></div>
+
+    <div id="side">
+      <div class="panel">
+        <div class="panel-title">
+          <span class="ax-x">X</span><span class="ax-y">Y</span> plane
+          <span class="sub">view from +z</span>
+        </div>
+        <div class="panel-body"><canvas id="plane-xy"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">
+          <span class="ax-x">X</span><span class="ax-z">Z</span> plane
+          <span class="sub">view from &minus;y</span>
+        </div>
+        <div class="panel-body"><canvas id="plane-xz"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">
+          <span class="ax-y">Y</span><span class="ax-z">Z</span> plane
+          <span class="sub">view from +x</span>
+        </div>
+        <div class="panel-body"><canvas id="plane-yz"></canvas></div>
+      </div>
+    </div>
+
+    <footer>
+      <div id="gates" class="btn-group"></div>
+      <div class="btn-group">
+        <button id="btn-reset" class="util" title="Reset to |0&rangle;">Reset |0&rangle;</button>
+        <button id="btn-random" class="util" title="Jump to a random pure state">Random</button>
+        <button id="btn-clear" class="util" title="Clear the motion trace">Clear trace</button>
+      </div>
+      <div id="readout">
+        <div id="ro-psi"></div>
+        <div id="ro-ang"></div>
+        <div id="ro-vec"></div>
+      </div>
+    </footer>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
